@@ -1,0 +1,1173 @@
+openapi: 3.0.3
+info:
+  title: TriFlow API
+  description: |
+    Backend di TriFlow: un sistema unico che integra GTD, Pomodoro e
+    Second Brain (PARA). Le task GTD si lavorano in sessioni Pomodoro,
+    le note del Second Brain si collegano a task e progetti.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: locale (compose)
+
+tags:
+  - name: auth
+  - name: users
+  - name: gtd
+  - name: pomodoro
+  - name: notes
+  - name: integration
+  - name: quiz
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Crea un nuovo utente
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Utente creato
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Token coppia
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Scambia refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Nuova coppia
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPairEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Logout (revoca refresh)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204': { description: No Content }
+
+  /users/me:
+    get:
+      tags: [users]
+      summary: Utente corrente
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [users]
+      summary: Aggiorna profilo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [display_name]
+              properties:
+                display_name: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserEnvelope' }
+
+  /users/me/preferences:
+    get:
+      tags: [users]
+      summary: Preferenze utente
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPreferencesEnvelope' }
+    put:
+      tags: [users]
+      summary: Aggiorna preferenze
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserPreferences' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPreferencesEnvelope' }
+
+  /inbox:
+    post:
+      tags: [gtd]
+      summary: Cattura veloce in inbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [raw_text]
+              properties:
+                raw_text: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InboxItemEnvelope' }
+    get:
+      tags: [gtd]
+      summary: Lista inbox non processati
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/InboxItem' }
+                      meta: { $ref: '#/components/schemas/PageMeta' }
+
+  /inbox/{id}/process:
+    post:
+      tags: [gtd]
+      summary: Processa un inbox item in task/project/discard
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProcessInboxRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task:    { $ref: '#/components/schemas/Task' }
+                          project: { $ref: '#/components/schemas/Project' }
+
+  /projects:
+    post:
+      tags: [gtd]
+      summary: Crea progetto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectEnvelope' }
+    get:
+      tags: [gtd]
+      summary: Lista progetti
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, someday, completed] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Project' }
+                      meta: { $ref: '#/components/schemas/PageMeta' }
+
+  /projects/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [gtd]
+      summary: Dettaglio progetto
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectEnvelope' } } } } }
+    put:
+      tags: [gtd]
+      summary: Aggiorna progetto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectRequest' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectEnvelope' } } } } }
+    delete:
+      tags: [gtd]
+      summary: Elimina progetto
+      responses: { '204': { description: No Content } }
+
+  /contexts:
+    post:
+      tags: [gtd]
+      summary: Crea contesto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 50 }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ContextEnvelope' } } } }
+    get:
+      tags: [gtd]
+      summary: Lista contesti
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Context' }
+
+  /contexts/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    delete:
+      tags: [gtd]
+      summary: Elimina contesto
+      responses: { '204': { description: No Content } }
+
+  /tasks:
+    post:
+      tags: [gtd]
+      summary: Crea task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskRequest' }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } }
+    get:
+      tags: [gtd]
+      summary: Lista task
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [inbox, next_action, waiting, scheduled, done] }
+        - in: query
+          name: project_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: context_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: due_before
+          schema: { type: string, format: date-time }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Task' }
+                      meta: { $ref: '#/components/schemas/PageMeta' }
+
+  /tasks/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [gtd]
+      summary: Dettaglio task
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } } }
+    patch:
+      tags: [gtd]
+      summary: Aggiorna task (parziale)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskPatchRequest' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } } }
+    delete:
+      tags: [gtd]
+      summary: Elimina task
+      responses: { '204': { description: No Content } }
+
+  /tasks/{id}/context:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [integration]
+      summary: Task + sessioni pomodoro + note collegate
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TaskContext' }
+
+  /reviews/weekly:
+    get:
+      tags: [gtd]
+      summary: Weekly review
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WeeklyReview' }
+
+  /pomodoros/start:
+    post:
+      tags: [pomodoro]
+      summary: Avvia un timer pomodoro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PomodoroStartRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActiveTimerEnvelope' }
+        '409':
+          description: timer già attivo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /pomodoros/pause:
+    post:
+      tags: [pomodoro]
+      summary: Pausa il timer attivo
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ActiveTimerEnvelope' } } } } }
+
+  /pomodoros/resume:
+    post:
+      tags: [pomodoro]
+      summary: Riprende il timer in pausa
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ActiveTimerEnvelope' } } } } }
+
+  /pomodoros/current:
+    get:
+      tags: [pomodoro]
+      summary: Stato timer attivo
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ActiveTimerEnvelope' } } } }
+        '404': { description: nessun timer attivo, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /pomodoros/complete:
+    post:
+      tags: [pomodoro]
+      summary: Conclude e persiste la sessione attiva
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PomodoroSessionEnvelope' } } } } }
+
+  /pomodoros/abort:
+    post:
+      tags: [pomodoro]
+      summary: Annulla la sessione attiva (salvata come aborted)
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PomodoroSessionEnvelope' } } } } }
+
+  /pomodoros/sessions:
+    get:
+      tags: [pomodoro]
+      summary: Storico sessioni
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PomodoroSession' }
+                      meta: { $ref: '#/components/schemas/PageMeta' }
+
+  /pomodoros/stats:
+    get:
+      tags: [pomodoro]
+      summary: Statistiche aggregate
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PomodoroStats' }
+
+  /notes:
+    post:
+      tags: [notes]
+      summary: Crea nota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteRequest' }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/NoteEnvelope' } } } }
+    get:
+      tags: [notes]
+      summary: Lista note (con full-text search)
+      parameters:
+        - in: query
+          name: para_category
+          schema: { type: string, enum: [project, area, resource, archive] }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Note' }
+                      meta: { $ref: '#/components/schemas/PageMeta' }
+
+  /notes/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [notes]
+      summary: Dettaglio nota
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/NoteEnvelope' } } } } }
+    patch:
+      tags: [notes]
+      summary: Aggiorna nota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotePatchRequest' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/NoteEnvelope' } } } } }
+    delete:
+      tags: [notes]
+      summary: Elimina nota
+      responses: { '204': { description: No Content } }
+
+  /notes/{id}/backlinks:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [notes]
+      summary: Note che linkano questa
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Note' }
+
+  /notes/{id}/links:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [notes]
+      summary: Note linkate da questa
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Note' }
+    post:
+      tags: [notes]
+      summary: Aggiungi link a un'altra nota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_note_id]
+              properties:
+                target_note_id: { type: string, format: uuid }
+      responses: { '204': { description: No Content } }
+
+  /notes/{id}/links/{targetId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - in: path
+        name: targetId
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [notes]
+      summary: Rimuovi link
+      responses: { '204': { description: No Content } }
+
+  /notes/{id}/refs:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      tags: [notes]
+      summary: Collega la nota a un task o project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteRefRequest' }
+      responses: { '204': { description: No Content } }
+
+  /notes/{id}/refs/{refType}/{refId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - in: path
+        name: refType
+        required: true
+        schema: { type: string, enum: [task, project] }
+      - in: path
+        name: refId
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [notes]
+      summary: Rimuovi collegamento
+      responses: { '204': { description: No Content } }
+
+  /notes/{id}/promote-to-task:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      tags: [integration]
+      summary: Promuove una nota in task GTD (con ref bidirezionale)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromoteNoteRequest' }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } }
+
+  /dashboard:
+    get:
+      tags: [integration]
+      summary: Dashboard unificata (oggi, timer attivo, note recenti, stats)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Dashboard' }
+
+  /quiz/score:
+    post:
+      tags: [quiz]
+      summary: Calcola la raccomandazione di metodo
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuizAnswers' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QuizResult' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    Limit:
+      in: query
+      name: limit
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Offset:
+      in: query
+      name: offset
+      schema: { type: integer, minimum: 0, default: 0 }
+
+  responses:
+    BadRequest:
+      description: Input non valido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: Non autorizzato
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: Conflitto
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+    Envelope:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+
+    ErrorEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            error:
+              type: object
+              required: [code, message]
+              properties:
+                code:    { type: string }
+                message: { type: string }
+                details: { type: object, additionalProperties: true }
+
+    PageMeta:
+      type: object
+      properties:
+        limit:  { type: integer }
+        offset: { type: integer }
+        total:  { type: integer }
+
+    User:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        email:        { type: string, format: email }
+        display_name: { type: string }
+        created_at:   { type: string, format: date-time }
+        updated_at:   { type: string, format: date-time }
+
+    UserEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/User' }
+
+    UserPreferences:
+      type: object
+      required: [pomodoro_duration_min, short_break_min, long_break_min, pomodoros_until_long_break, timezone]
+      properties:
+        user_id:                     { type: string, format: uuid, readOnly: true }
+        pomodoro_duration_min:       { type: integer, minimum: 1, maximum: 180 }
+        short_break_min:             { type: integer, minimum: 1, maximum: 60 }
+        long_break_min:              { type: integer, minimum: 1, maximum: 120 }
+        pomodoros_until_long_break:  { type: integer, minimum: 2, maximum: 12 }
+        timezone:                    { type: string }
+        updated_at:                  { type: string, format: date-time, readOnly: true }
+
+    UserPreferencesEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/UserPreferences' }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, display_name]
+      properties:
+        email:        { type: string, format: email }
+        password:     { type: string, minLength: 8 }
+        display_name: { type: string, minLength: 1, maxLength: 80 }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string }
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:      { type: string }
+        refresh_token:     { type: string }
+        access_expires_at: { type: string, format: date-time }
+
+    LoginEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user:   { $ref: '#/components/schemas/User' }
+                tokens: { $ref: '#/components/schemas/TokenPair' }
+
+    TokenPairEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/TokenPair' }
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+
+    InboxItem:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        user_id:      { type: string, format: uuid }
+        raw_text:     { type: string }
+        processed_at: { type: string, format: date-time, nullable: true }
+        created_at:   { type: string, format: date-time }
+
+    InboxItemEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/InboxItem' }
+
+    ProcessInboxRequest:
+      type: object
+      required: [action]
+      properties:
+        action:     { type: string, enum: [task, project, discard] }
+        title:      { type: string }
+        notes:      { type: string }
+        status:     { type: string, enum: [inbox, next_action, waiting, scheduled, done] }
+        context_id: { type: string, format: uuid, nullable: true }
+        project_id: { type: string, format: uuid, nullable: true }
+        energy:     { type: string, enum: [low, medium, high], nullable: true }
+        due_date:   { type: string, format: date-time, nullable: true }
+        priority:   { type: integer }
+        tags:
+          type: array
+          items: { type: string }
+
+    Project:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        user_id:      { type: string, format: uuid }
+        title:        { type: string }
+        description:  { type: string }
+        status:       { type: string, enum: [active, someday, completed] }
+        created_at:   { type: string, format: date-time }
+        updated_at:   { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    ProjectEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Project' }
+
+    ProjectRequest:
+      type: object
+      required: [title]
+      properties:
+        title:       { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string }
+        status:      { type: string, enum: [active, someday, completed] }
+
+    Context:
+      type: object
+      properties:
+        id:         { type: string, format: uuid }
+        user_id:    { type: string, format: uuid }
+        name:       { type: string }
+        created_at: { type: string, format: date-time }
+
+    ContextEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Context' }
+
+    Task:
+      type: object
+      properties:
+        id:                { type: string, format: uuid }
+        user_id:           { type: string, format: uuid }
+        project_id:        { type: string, format: uuid, nullable: true }
+        context_id:        { type: string, format: uuid, nullable: true }
+        title:             { type: string }
+        notes:             { type: string }
+        status:            { type: string, enum: [inbox, next_action, waiting, scheduled, done] }
+        energy:            { type: string, enum: [low, medium, high], nullable: true }
+        estimated_minutes: { type: integer, nullable: true }
+        priority:          { type: integer }
+        due_date:          { type: string, format: date-time, nullable: true }
+        defer_date:        { type: string, format: date-time, nullable: true }
+        completed_at:      { type: string, format: date-time, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+        created_at:        { type: string, format: date-time }
+        updated_at:        { type: string, format: date-time }
+
+    TaskEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Task' }
+
+    TaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:             { type: string, minLength: 1, maxLength: 200 }
+        notes:             { type: string }
+        project_id:        { type: string, format: uuid, nullable: true }
+        context_id:        { type: string, format: uuid, nullable: true }
+        status:            { type: string, enum: [inbox, next_action, waiting, scheduled, done] }
+        energy:            { type: string, enum: [low, medium, high], nullable: true }
+        estimated_minutes: { type: integer, minimum: 1, nullable: true }
+        priority:          { type: integer }
+        due_date:          { type: string, format: date-time, nullable: true }
+        defer_date:        { type: string, format: date-time, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+
+    TaskPatchRequest:
+      allOf:
+        - $ref: '#/components/schemas/TaskRequest'
+
+    TaskContext:
+      type: object
+      properties:
+        task:               { $ref: '#/components/schemas/Task' }
+        pomodoro_sessions:
+          type: array
+          items: { $ref: '#/components/schemas/PomodoroSession' }
+        linked_notes:
+          type: array
+          items: { $ref: '#/components/schemas/Note' }
+
+    WeeklyReview:
+      type: object
+      properties:
+        inbox_to_process:
+          type: array
+          items: { $ref: '#/components/schemas/InboxItem' }
+        waiting_tasks:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        projects_without_next_action:
+          type: array
+          items: { $ref: '#/components/schemas/Project' }
+        generated_at: { type: string, format: date-time }
+
+    PomodoroStartRequest:
+      type: object
+      properties:
+        task_id:      { type: string, format: uuid, nullable: true }
+        kind:         { type: string, enum: [focus, short_break, long_break] }
+        cycle_index:  { type: integer, minimum: 1 }
+        duration_sec: { type: integer, minimum: 1 }
+
+    ActiveTimer:
+      type: object
+      properties:
+        user_id:                  { type: string, format: uuid }
+        task_id:                  { type: string, format: uuid, nullable: true }
+        kind:                     { type: string, enum: [focus, short_break, long_break] }
+        planned_duration_sec:     { type: integer }
+        cycle_index:              { type: integer }
+        started_at:               { type: string, format: date-time }
+        paused_at:                { type: string, format: date-time, nullable: true }
+        elapsed_before_pause_sec: { type: integer }
+
+    ActiveTimerEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/ActiveTimer' }
+
+    PomodoroSession:
+      type: object
+      properties:
+        id:                   { type: string, format: uuid }
+        user_id:              { type: string, format: uuid }
+        task_id:              { type: string, format: uuid, nullable: true }
+        kind:                 { type: string, enum: [focus, short_break, long_break] }
+        planned_duration_sec: { type: integer }
+        actual_duration_sec:  { type: integer }
+        cycle_index:          { type: integer }
+        started_at:           { type: string, format: date-time }
+        ended_at:             { type: string, format: date-time }
+        status:               { type: string, enum: [completed, aborted] }
+        created_at:           { type: string, format: date-time }
+
+    PomodoroSessionEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PomodoroSession' }
+
+    PomodoroStats:
+      type: object
+      properties:
+        pomodoros_completed: { type: integer }
+        focus_seconds:       { type: integer }
+        by_day:
+          type: object
+          additionalProperties: { type: integer }
+        by_task:
+          type: object
+          additionalProperties: { type: integer }
+
+    Note:
+      type: object
+      properties:
+        id:            { type: string, format: uuid }
+        user_id:       { type: string, format: uuid }
+        title:         { type: string }
+        content_md:    { type: string }
+        para_category: { type: string, enum: [project, area, resource, archive] }
+        tags:
+          type: array
+          items: { type: string }
+        created_at:    { type: string, format: date-time }
+        updated_at:    { type: string, format: date-time }
+
+    NoteEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Note' }
+
+    NoteRequest:
+      type: object
+      required: [title]
+      properties:
+        title:         { type: string, minLength: 1, maxLength: 200 }
+        content_md:    { type: string }
+        para_category: { type: string, enum: [project, area, resource, archive] }
+        tags:
+          type: array
+          items: { type: string }
+
+    NotePatchRequest:
+      allOf:
+        - $ref: '#/components/schemas/NoteRequest'
+
+    NoteRefRequest:
+      type: object
+      required: [ref_type, ref_id]
+      properties:
+        ref_type: { type: string, enum: [task, project] }
+        ref_id:   { type: string, format: uuid }
+
+    PromoteNoteRequest:
+      type: object
+      properties:
+        title:      { type: string }
+        project_id: { type: string, format: uuid, nullable: true }
+        context_id: { type: string, format: uuid, nullable: true }
+        status:     { type: string, enum: [inbox, next_action, waiting, scheduled, done] }
+        due_date:   { type: string, format: date-time, nullable: true }
+        priority:   { type: integer }
+
+    Dashboard:
+      type: object
+      properties:
+        today_tasks:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        active_timer:
+          allOf: [ { $ref: '#/components/schemas/ActiveTimer' } ]
+          nullable: true
+        recent_notes:
+          type: array
+          items: { $ref: '#/components/schemas/Note' }
+        pomodoros_today:    { type: integer }
+        focus_seconds_week: { type: integer }
+        generated_at:       { type: string, format: date-time }
+
+    QuizAnswers:
+      type: object
+      required: [main_problem, work_style, setup_tolerance, goal]
+      properties:
+        main_problem:    { type: string, enum: [overwhelm, distraction, knowledge_loss] }
+        work_style:      { type: string, enum: [structured, flexible, creative] }
+        setup_tolerance: { type: string, enum: [low, medium, high] }
+        goal:            { type: string, enum: [ship_tasks, focus_time, build_knowledge] }
+
+    MethodScore:
+      type: object
+      properties:
+        method:      { type: string, enum: [gtd, pomodoro, second_brain] }
+        score:       { type: integer, minimum: 0, maximum: 100 }
+        explanation: { type: string }
+
+    QuizResult:
+      type: object
+      properties:
+        recommended_method: { type: string, enum: [gtd, pomodoro, second_brain] }
+        reasoning:          { type: string }
+        scores:
+          type: array
+          items: { $ref: '#/components/schemas/MethodScore' }

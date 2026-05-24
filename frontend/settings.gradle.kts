@@ -19,8 +19,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven(url = "https://jitpack.io")
     }
 }
 
 rootProject.name = "TriFlow"
 include(":app")
+include(":core")
+include(":data")
+include(":domain")
