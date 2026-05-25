@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.app.triflow.data.remote.mapper.QuizMapperTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-25T11:46:48.580Z" hostname="mainfilippo" time="0.013">
+  <properties/>
+  <testcase name="MethodScoreDto toDomain maps fields and method enum" classname="com.app.triflow.data.remote.mapper.QuizMapperTest" time="0.001"/>
+  <testcase name="unknown recommended method falls back to Gtd by contract" classname="com.app.triflow.data.remote.mapper.QuizMapperTest" time="0.004"/>
+  <testcase name="QuizAnswers toDto serializes all four fields to wire format" classname="com.app.triflow.data.remote.mapper.QuizMapperTest" time="0.001"/>
+  <testcase name="QuizResultDto toDomain preserves scores order and content" classname="com.app.triflow.data.remote.mapper.QuizMapperTest" time="0.007"/>
+  <testcase name="QuizResultDto with empty scores maps to empty list" classname="com.app.triflow.data.remote.mapper.QuizMapperTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

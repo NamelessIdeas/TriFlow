@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.EventNote
+import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,7 +49,7 @@ private fun Content(review: WeeklyReview, onOpenTaskDetail: (String) -> Unit) {
         review.projectsWithoutNextAction.isEmpty()
     if (nothing) {
         EmptyView(
-            icon = Icons.Outlined.EventNote,
+            icon = Icons.AutoMirrored.Outlined.EventNote,
             title = "Tutto pulito",
             subtitle = "Nessun item in sospeso. Buon lavoro.",
         )

@@ -11,7 +11,7 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DataObject
 import androidx.compose.material.icons.outlined.FormatBold
 import androidx.compose.material.icons.outlined.FormatItalic
-import androidx.compose.material.icons.outlined.FormatListBulleted
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.FormatStrikethrough
 import androidx.compose.material.icons.outlined.Link
@@ -58,7 +58,7 @@ fun MarkdownToolbar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        IconButton(onClick = onList) { Icon(Icons.Outlined.FormatListBulleted, contentDescription = "Lista") }
+        IconButton(onClick = onList) { Icon(Icons.AutoMirrored.Outlined.FormatListBulleted, contentDescription = "Lista") }
         IconButton(onClick = onQuote) { Icon(Icons.Outlined.FormatQuote, contentDescription = "Citazione") }
         IconButton(onClick = onCodeInline) { Icon(Icons.Outlined.Code, contentDescription = "Codice inline") }
         IconButton(onClick = onCodeBlock) { Icon(Icons.Outlined.DataObject, contentDescription = "Code block") }
